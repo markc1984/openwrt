@@ -12,6 +12,16 @@ define Device/d-link_dgs-1250-28x
 endef
 TARGET_DEVICES += d-link_dgs-1250-28x
 
+define Device/hasivo_f1100wp-4sx-4xgt
+  SOC := rtl9303
+  DEVICE_VENDOR := Hasivo
+  DEVICE_MODEL := F1100WP-4SX-4XGT
+  DEVICE_PACKAGES := kmod-phy-realtek rtl8264b-firmware
+  IMAGE_SIZE := 12288k
+  $(Device/kernel-lzma)
+endef
+TARGET_DEVICES += hasivo_f1100wp-4sx-4xgt
+
 define Device/hasivo_s1100w-8xgt-se
   SOC := rtl9303
   DEVICE_VENDOR := Hasivo
