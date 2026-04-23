@@ -17,7 +17,7 @@ define Device/hasivo_f1100w-4sx-4xgt
   DEVICE_VENDOR := Hasivo
   DEVICE_MODEL := F1100W-4SX-4XGT
   DEVICE_PACKAGES := kmod-phy-realtek rtl8264b-firmware
-  IMAGE_SIZE := 12288k
+  IMAGE_SIZE := 14848k
   $(Device/kernel-lzma)
 endef
 TARGET_DEVICES += hasivo_f1100w-4sx-4xgt
@@ -27,7 +27,7 @@ define Device/hasivo_f1100wp-4sx-4xgt
   DEVICE_VENDOR := Hasivo
   DEVICE_MODEL := F1100WP-4SX-4XGT
   DEVICE_PACKAGES := kmod-phy-realtek rtl8264b-firmware kmod-pse-hasivo-hs104
-  IMAGE_SIZE := 12288k
+  IMAGE_SIZE := 14848k
   $(Device/kernel-lzma)
 endef
 TARGET_DEVICES += hasivo_f1100wp-4sx-4xgt
