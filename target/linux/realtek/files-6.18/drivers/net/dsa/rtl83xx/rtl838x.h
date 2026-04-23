@@ -827,6 +827,9 @@ typedef enum {
 #define RTL930X_LED_PORT_COPR_MASK_CTRL		(0xCC3C)
 #define RTL930X_LED_PORT_FIB_MASK_CTRL		(0xCC40)
 #define RTL930X_LED_PORT_COMBO_MASK_CTRL	(0xCC44)
+#define RTL930X_SW_LED_LOAD			(0xCC48)
+#define RTL930X_LED_PORT_SW_EN_CTRL(p)		(0xCC4C + (((p) / 8) << 2))
+#define RTL930X_LED_PORT_SW_CTRL(p)		(0xCC5C + ((p) << 2))
 
 #define RTL931X_LED_PORT_NUM_CTRL(p)		(0x0604 + (((p >> 4) << 2)))
 #define RTL931X_LED_SET0_0_CTRL			(0x0630)

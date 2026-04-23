@@ -41,6 +41,13 @@
 #define WRAP		0x2
 #define RING_BUFFER	1600
 
+static const u8 rteth_dummy_mac_addr[ETH_ALEN] = { 0x00, 0xe0, 0x4c, 0x00, 0x00, 0x00 };
+
+static bool rteth_mac_is_usable(const u8 *addr)
+{
+	return is_valid_ether_addr(addr) && !ether_addr_equal(addr, rteth_dummy_mac_addr);
+}
+
 struct rteth_packet {
 	/* hardware header part as required by SoC */
 	dma_addr_t		dma;
@@ -1546,7 +1553,7 @@ static int rteth_probe(struct platform_device *pdev)
 	if (err == -EPROBE_DEFER)
 		return err;
 
-	if (is_valid_ether_addr(mac_addr)) {
+	if (rteth_mac_is_usable(mac_addr)) {
 		rteth_set_mac_hw(dev, mac_addr);
 	} else {
 		mac_addr[0] = (sw_r32(ctrl->r->mac_reg[0]) >> 8) & 0xff;
@@ -1558,10 +1565,10 @@ static int rteth_probe(struct platform_device *pdev)
 	}
 	dev_addr_set(dev, mac_addr);
 	/* if the address is invalid, use a random value */
-	if (!is_valid_ether_addr(dev->dev_addr)) {
+	if (!rteth_mac_is_usable(dev->dev_addr)) {
 		struct sockaddr sa = { AF_UNSPEC };
 
-		netdev_warn(dev, "Invalid MAC address, using random\n");
+		netdev_warn(dev, "Dummy MAC address, using random\n");
 		eth_hw_addr_random(dev);
 		memcpy(sa.sa_data, dev->dev_addr, ETH_ALEN);
 		if (rteth_set_mac_address(dev, &sa))

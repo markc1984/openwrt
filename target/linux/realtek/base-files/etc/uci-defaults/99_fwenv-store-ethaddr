@@ -40,6 +40,20 @@ zyxel,xgs1010-12-a1)
 		[ -n "$board_ethaddr" ] && fw_setenv ethaddr "$board_ethaddr"
 	fi
 	;;
+hasivo,f1100w-4sx-4xgt|\
+hasivo,f1100wp-4sx-4xgt)
+	env_ethaddr=$(macaddr_canonicalize "$(fw_printenv -n ethaddr 2>/dev/null)")
+
+	if [ -z "$env_ethaddr" ] || [ "$env_ethaddr" = "00:e0:4c:00:00:00" ]; then
+		json_init
+		json_load_file "$BOARD_CFG"
+		json_select network_device
+		json_select eth0
+		json_get_var board_ethaddr macaddr
+		board_ethaddr=$(macaddr_canonicalize "$board_ethaddr")
+		[ -n "$board_ethaddr" ] && [ "$board_ethaddr" != "00:e0:4c:00:00:00" ] && fw_setenv ethaddr "$board_ethaddr"
+	fi
+	;;
 esac
 
 exit 0

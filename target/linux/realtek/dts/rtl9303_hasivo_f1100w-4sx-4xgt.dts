@@ -8,8 +8,8 @@
 #include <dt-bindings/leds/common.h>
 
 / {
-	compatible = "hasivo,f1100wp-4sx-4xgt", "realtek,rtl930x-soc";
-	model = "Hasivo F1100WP-4SX-4XGT";
+	compatible = "hasivo,f1100w-4sx-4xgt", "realtek,rtl930x-soc";
+	model = "Hasivo F1100W-4SX-4XGT";
 
 	memory@0 {
 		device_type = "memory";
@@ -35,12 +35,6 @@
 		compatible = "realtek,rtl9300-leds";
 		active-low;
 
-		/*
-		 * Stock port_type 22 writes LED_SET0_0 as 0x0a010bfe:
-		 * SET0_LED1_SEL = 0x0a01, SET0_LED0_SEL = 0x0bfe.
-		 * The OpenWrt LED parser assigns the first value to LED1 and
-		 * the second value to LED0.
-		 */
 		led_set0 = <0x0a01 0x0bfe>;
 	};
 
@@ -74,42 +68,6 @@
 		mod-def0-gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
 		maximum-power-milliwatt = <2000>;
 		#thermal-sensor-cells = <0>;
-	};
-
-	/*
-	 * PoE/LED I2C bus. i2cdetect proved three devices at 0x0d (HS104
-	 * PSE), 0x4d (STC8 LED MFD) and 0x50 (EEPROM). Note SCL/SDA are the
-	 * reverse of the sibling s1100wp-8gt-se: SCL=gpio22, SDA=gpio23.
-	 */
-	i2c_pse: i2c-gpio {
-		compatible = "i2c-gpio";
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		scl-gpios = <&gpio0 22 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-		sda-gpios = <&gpio0 23 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-		clock-frequency = <100000>;
-		status = "okay";
-
-		pse0: pse0@d {
-			compatible = "hasivo,hs104";
-			reg = <0x0d>;
-			#pse-cells = <1>;
-			led-poll-interval-ms = <500>;
-			hasivo,poe-led-i2c-addr = <0x4d>;
-			hasivo,poe-led-reg = <0x01>;
-			hasivo,poe-led-execute-bit = <0x40>;
-			hasivo,poe-led-masks = <0x08 0x04 0x02 0x01>;
-			status = "okay";
-
-			/*
-			 * HS104PTI variant: 1x 802.3bt/HiPoE + 3x 802.3at.
-			 * PI 0 -> lan5 (HiPoE 90W), PI 1..3 -> lan6..8 (AT 30W).
-			 * Values map to the driver's PROTOCOL register encoding:
-			 *   <=15.4W=AF, <=30W=AT, <=60W=BT, <=90W=HiPoE.
-			 */
-			hasivo,port-max-power-mw = <90000 30000 30000 30000>;
-		};
 	};
 };
 
@@ -172,7 +130,7 @@
 				compatible = "openwrt,uimage", "denx,uimage";
 				label = "oeminfo";
 				reg = <0x1180000 0x0e80000>;
-        read-only;
+				read-only;
 			};
 		};
 	};
@@ -193,11 +151,6 @@
 &mdio_bus3 {
 	PHY_C45(25, 16)
 };
-
-&phy24 { pses = <&pse0 0>; };
-&phy25 { pses = <&pse0 1>; };
-&phy26 { pses = <&pse0 2>; };
-&phy27 { pses = <&pse0 3>; };
 
 &switch0 {
 	ethernet-ports {

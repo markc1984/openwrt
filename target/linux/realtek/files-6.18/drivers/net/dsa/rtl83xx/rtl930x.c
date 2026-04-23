@@ -2,7 +2,9 @@
 
 #include <asm/mach-rtl-otto/mach-rtl-otto.h>
 #include <linux/etherdevice.h>
+#include <linux/export.h>
 #include <linux/inetdevice.h>
+#include <linux/of.h>
 
 #include "rtl83xx.h"
 
@@ -23,6 +25,9 @@
 #define RTL930X_VLAN_PORT_TAG_STS_CTRL_IGR_P_ITAG_KEEP_MASK	GENMASK(0, 0)
 
 #define RTL930X_LED_GLB_ACTIVE_LOW				BIT(22)
+#define RTL930X_SW_LED_LOAD_START				BIT(0)
+#define RTL930X_LED_SWCTRL_MODE_OFF				6
+#define RTL930X_LED_SWCTRL_MODE_ON				7
 
 #define RTL930X_LED_SETX_0_CTRL(x) (RTL930X_LED_SET0_0_CTRL - (x * 8))
 #define RTL930X_LED_SETX_1_CTRL(x) (RTL930X_LED_SETX_0_CTRL(x) - 4)
@@ -2623,6 +2628,112 @@ static void rtldsa_930x_led_get_forced(const struct device_node *node,
 	}
 }
 
+static void rtl930x_led_set_port_num_raw(int port, u32 raw_num)
+{
+	int pos = (port << 1) % 32;
+
+	sw_w32_mask(0x3 << pos, raw_num << pos, RTL930X_LED_PORT_NUM_CTRL(port));
+}
+
+static void rtl930x_led_clear_port_selectors(int port)
+{
+	int pos = (port << 1) % 32;
+
+	sw_w32_mask(0x3 << pos, 0, RTL930X_LED_PORT_COPR_SET_SEL_CTRL(port));
+	sw_w32_mask(0x3 << pos, 0, RTL930X_LED_PORT_FIB_SET_SEL_CTRL(port));
+}
+
+static void rtl930x_led_swctrl_copr_set(int port, int led, bool on)
+{
+	u32 en_shift = (port % 8) * 4;
+	u32 mode_shift;
+	u32 mode = on ? RTL930X_LED_SWCTRL_MODE_ON : RTL930X_LED_SWCTRL_MODE_OFF;
+
+	if (led < 0 || led > 3)
+		return;
+
+	mode_shift = led * 3;
+	sw_w32_mask(BIT(led) << en_shift, BIT(led) << en_shift,
+		    RTL930X_LED_PORT_SW_EN_CTRL(port));
+	sw_w32_mask(GENMASK(mode_shift + 2, mode_shift), mode << mode_shift,
+		    RTL930X_LED_PORT_SW_CTRL(port));
+	sw_w32_mask(RTL930X_SW_LED_LOAD_START, RTL930X_SW_LED_LOAD_START,
+		    RTL930X_SW_LED_LOAD);
+}
+
+void rtl930x_hasivo_f1100wp_poe_led_set(unsigned int id, bool on);
+
+void rtl930x_hasivo_f1100wp_poe_led_set(unsigned int id, bool on)
+{
+	static const int copper_ports[] = { 24, 25, 26, 27 };
+
+	if (!of_machine_is_compatible("hasivo,f1100wp-4sx-4xgt"))
+		return;
+
+	if (id >= ARRAY_SIZE(copper_ports))
+		return;
+
+	/* Stock i2c-poe.ko uses software LED mode 7 for PoE-on and 0 for off. */
+	rtl930x_led_swctrl_copr_set(copper_ports[id], 2, on);
+}
+EXPORT_SYMBOL_GPL(rtl930x_hasivo_f1100wp_poe_led_set);
+
+static void rtl930x_led_init_hasivo_f1100wp(struct rtl838x_switch_priv *priv)
+{
+	static const int sfp_ports[] = { 0, 8, 16, 20 };
+	static const int copper_ports[] = { 24, 25, 26, 27 };
+	u32 sfp_mask = 0;
+	u32 copper_mask = 0;
+
+	if (!of_machine_is_compatible("hasivo,f1100wp-4sx-4xgt"))
+		return;
+
+	/*
+	 * Stock port_type 22 programs LED_SET0_0 only:
+	 * SET0_LED1_SEL = 0x0a01, SET0_LED0_SEL = 0x0bfe.
+	 */
+	sw_w32(0x0a010bfe, RTL930X_LED_SETX_0_CTRL(0));
+	sw_w32(0, RTL930X_LED_SETX_1_CTRL(0));
+
+	for (int i = 0; i < ARRAY_SIZE(sfp_ports); i++) {
+		int port = sfp_ports[i];
+
+		rtl930x_led_set_port_num_raw(port, 2);
+		rtl930x_led_clear_port_selectors(port);
+		sfp_mask |= BIT(port);
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(copper_ports); i++) {
+		int port = copper_ports[i];
+
+		rtl930x_led_set_port_num_raw(port, 2);
+		rtl930x_led_clear_port_selectors(port);
+		rtl930x_led_swctrl_copr_set(port, 2, false);
+		copper_mask |= BIT(port);
+	}
+
+	/*
+	 * Stock splits the masks by front-panel media:
+	 * SFP ports use FIB, 10GBase-T ports use COPR, all use COMBO.
+	 *
+	 * The copper LEDs validate the stock LED_SET0 value and COPR path.
+	 * Keep the stock FIB mask, but also expose the SFP ports through COPR;
+	 * on this board the visible SFP LEDs appear to be driven by that scan
+	 * path rather than the plain FIB mask used by the SDK names.
+	 */
+	sw_w32(sfp_mask | copper_mask, RTL930X_LED_PORT_COPR_MASK_CTRL);
+	sw_w32(sfp_mask, RTL930X_LED_PORT_FIB_MASK_CTRL);
+	sw_w32(sfp_mask | copper_mask, RTL930X_LED_PORT_COMBO_MASK_CTRL);
+
+	dev_info(priv->dev,
+		 "F1100WP LED stock quirk: cc04=%08x cc08=%08x cc24=%08x cc28=%08x cc2c=%08x cc30=%08x cc34=%08x cc38=%08x cc3c=%08x cc40=%08x cc44=%08x\n",
+		 sw_r32(0xcc04), sw_r32(0xcc08),
+		 sw_r32(0xcc24), sw_r32(0xcc28),
+		 sw_r32(0xcc2c), sw_r32(0xcc30),
+		 sw_r32(0xcc34), sw_r32(0xcc38),
+		 sw_r32(0xcc3c), sw_r32(0xcc40), sw_r32(0xcc44));
+}
+
 static void rtl930x_led_init(struct rtl838x_switch_priv *priv)
 {
 	u8 forced_leds_per_port[RTL930X_CPU_PORT] = {};
@@ -2715,6 +2826,8 @@ static void rtl930x_led_init(struct rtl838x_switch_priv *priv)
 	sw_w32(pm, RTL930X_LED_PORT_COPR_MASK_CTRL);
 	sw_w32(pm, RTL930X_LED_PORT_FIB_MASK_CTRL);
 	sw_w32(pm, RTL930X_LED_PORT_COMBO_MASK_CTRL);
+
+	rtl930x_led_init_hasivo_f1100wp(priv);
 
 	for (int i = 0; i < 24; i++)
 		dev_dbg(dev, "%08x: %08x\n", 0xbb00cc00 + i * 4, sw_r32(0xcc00 + i * 4));
