@@ -2,6 +2,44 @@
 
 include ./common.mk
 
+F1100_COMMON_PACKAGES := \
+	cgi-io \
+	ethtool-full \
+	i2c-tools \
+	i2csfp \
+	kmod-bonding \
+	kmod-dummy \
+	kmod-geneve \
+	kmod-gre \
+	kmod-ifb \
+	kmod-ip6-tunnel \
+	kmod-ipip \
+	kmod-iptunnel \
+	kmod-ipvlan \
+	kmod-macvlan \
+	kmod-sched \
+	kmod-sched-core \
+	kmod-sit \
+	kmod-tun \
+	kmod-veth \
+	kmod-vrf \
+	kmod-vxlan \
+	kmod-wireguard \
+	libi2c \
+	libsysfs2 \
+	lm-sensors \
+	luci \
+	luci-app-firewall \
+	luci-app-package-manager \
+	proto-bonding \
+	rpcd-mod-luci \
+	sysfsutils \
+	uboot-envtools
+
+F1100_REALTEK_PACKAGES := \
+	kmod-phy-realtek \
+	rtl8264b-firmware
+
 define Device/d-link_dgs-1250-28x
   SOC := rtl9301
   DEVICE_VENDOR := D-Link
@@ -16,7 +54,7 @@ define Device/hasivo_f1100w-4sx-4xgt
   SOC := rtl9303
   DEVICE_VENDOR := Hasivo
   DEVICE_MODEL := F1100W-4SX-4XGT
-  DEVICE_PACKAGES := kmod-phy-realtek rtl8264b-firmware
+  DEVICE_PACKAGES := $(F1100_COMMON_PACKAGES) $(F1100_REALTEK_PACKAGES)
   IMAGE_SIZE := 14848k
   $(Device/kernel-lzma)
 endef
@@ -26,7 +64,7 @@ define Device/hasivo_f1100wp-4sx-4xgt
   SOC := rtl9303
   DEVICE_VENDOR := Hasivo
   DEVICE_MODEL := F1100WP-4SX-4XGT
-  DEVICE_PACKAGES := kmod-phy-realtek rtl8264b-firmware kmod-pse-hasivo-hs104
+  DEVICE_PACKAGES := $(F1100_COMMON_PACKAGES) $(F1100_REALTEK_PACKAGES) kmod-pse-hasivo-hs104
   IMAGE_SIZE := 14848k
   $(Device/kernel-lzma)
 endef
