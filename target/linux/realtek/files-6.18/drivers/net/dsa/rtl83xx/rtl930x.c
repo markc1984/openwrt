@@ -2678,14 +2678,20 @@ void rtl930x_hasivo_f1100wp_poe_led_set(unsigned int id, bool on)
 }
 EXPORT_SYMBOL_GPL(rtl930x_hasivo_f1100wp_poe_led_set);
 
-static void rtl930x_led_init_hasivo_f1100wp(struct rtl838x_switch_priv *priv)
+static bool rtl930x_hasivo_f1100_is_compatible(void)
+{
+	return of_machine_is_compatible("hasivo,f1100w-4sx-4xgt") ||
+	       of_machine_is_compatible("hasivo,f1100wp-4sx-4xgt");
+}
+
+static void rtl930x_led_init_hasivo_f1100(struct rtl838x_switch_priv *priv)
 {
 	static const int sfp_ports[] = { 0, 8, 16, 20 };
 	static const int copper_ports[] = { 24, 25, 26, 27 };
 	u32 sfp_mask = 0;
 	u32 copper_mask = 0;
 
-	if (!of_machine_is_compatible("hasivo,f1100wp-4sx-4xgt"))
+	if (!rtl930x_hasivo_f1100_is_compatible())
 		return;
 
 	/*
@@ -2726,7 +2732,7 @@ static void rtl930x_led_init_hasivo_f1100wp(struct rtl838x_switch_priv *priv)
 	sw_w32(sfp_mask | copper_mask, RTL930X_LED_PORT_COMBO_MASK_CTRL);
 
 	dev_info(priv->dev,
-		 "F1100WP LED stock quirk: cc04=%08x cc08=%08x cc24=%08x cc28=%08x cc2c=%08x cc30=%08x cc34=%08x cc38=%08x cc3c=%08x cc40=%08x cc44=%08x\n",
+		 "F1100W/F1100WP LED stock quirk: cc04=%08x cc08=%08x cc24=%08x cc28=%08x cc2c=%08x cc30=%08x cc34=%08x cc38=%08x cc3c=%08x cc40=%08x cc44=%08x\n",
 		 sw_r32(0xcc04), sw_r32(0xcc08),
 		 sw_r32(0xcc24), sw_r32(0xcc28),
 		 sw_r32(0xcc2c), sw_r32(0xcc30),
@@ -2827,7 +2833,7 @@ static void rtl930x_led_init(struct rtl838x_switch_priv *priv)
 	sw_w32(pm, RTL930X_LED_PORT_FIB_MASK_CTRL);
 	sw_w32(pm, RTL930X_LED_PORT_COMBO_MASK_CTRL);
 
-	rtl930x_led_init_hasivo_f1100wp(priv);
+	rtl930x_led_init_hasivo_f1100(priv);
 
 	for (int i = 0; i < 24; i++)
 		dev_dbg(dev, "%08x: %08x\n", 0xbb00cc00 + i * 4, sw_r32(0xcc00 + i * 4));
