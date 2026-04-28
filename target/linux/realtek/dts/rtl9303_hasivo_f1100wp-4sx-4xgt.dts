@@ -144,6 +144,14 @@
 			partition@e0000 {
 				label = "u-boot-env";
 				reg = <0x00e0000 0x0010000>;
+
+				nvmem-layout {
+					compatible = "u-boot,env";
+
+					macaddr_ubootenv_ethaddr: ethaddr {
+						#nvmem-cell-cells = <1>;
+					};
+				};
 			};
 
 			partition@f0000 {
@@ -165,17 +173,15 @@
 			partition@300000 {
 				compatible = "openwrt,uimage", "denx,uimage";
 				label = "firmware";
-				reg = <0x0300000 0x0e80000>;
-			};
-
-			partition@f00000 {
-				compatible = "openwrt,uimage", "denx,uimage";
-				label = "oeminfo";
-				reg = <0x1180000 0x0e80000>;
-        read-only;
+				reg = <0x0300000 0x1d00000>;
 			};
 		};
 	};
+};
+
+&ethernet0 {
+	nvmem-cells = <&macaddr_ubootenv_ethaddr 0>;
+	nvmem-cell-names = "mac-address";
 };
 
 &mdio_bus0 {

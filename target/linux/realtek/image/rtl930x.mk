@@ -31,6 +31,7 @@ F1100_COMMON_PACKAGES := \
 	luci \
 	luci-app-firewall \
 	luci-app-package-manager \
+	luci-app-sfp-diagnostics \
 	proto-bonding \
 	rpcd-mod-luci \
 	sysfsutils \
@@ -55,7 +56,7 @@ define Device/hasivo_f1100w-4sx-4xgt
   DEVICE_VENDOR := Hasivo
   DEVICE_MODEL := F1100W-4SX-4XGT
   DEVICE_PACKAGES := $(F1100_COMMON_PACKAGES) $(F1100_REALTEK_PACKAGES)
-  IMAGE_SIZE := 14848k
+  IMAGE_SIZE := 29696k
   $(Device/kernel-lzma)
 endef
 TARGET_DEVICES += hasivo_f1100w-4sx-4xgt
@@ -65,7 +66,7 @@ define Device/hasivo_f1100wp-4sx-4xgt
   DEVICE_VENDOR := Hasivo
   DEVICE_MODEL := F1100WP-4SX-4XGT
   DEVICE_PACKAGES := $(F1100_COMMON_PACKAGES) $(F1100_REALTEK_PACKAGES) kmod-pse-hasivo-hs104
-  IMAGE_SIZE := 14848k
+  IMAGE_SIZE := 29696k
   $(Device/kernel-lzma)
 endef
 TARGET_DEVICES += hasivo_f1100wp-4sx-4xgt
