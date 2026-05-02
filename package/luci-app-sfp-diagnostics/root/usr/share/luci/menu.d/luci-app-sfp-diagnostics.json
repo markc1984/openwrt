@@ -1,0 +1,13 @@
+{
+	"admin/status/sfp-diagnostics": {
+		"title": "SFP Diagnostics",
+		"order": 35,
+		"action": {
+			"type": "view",
+			"path": "status/sfp-diagnostics"
+		},
+		"depends": {
+			"acl": [ "luci-app-sfp-diagnostics" ]
+		}
+	}
+}

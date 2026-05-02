@@ -1,0 +1,297 @@
+#!/usr/bin/ucode
+
+'use strict';
+
+import { access, lsdir, popen, readfile } from 'fs';
+
+const ethtool_paths = [
+	'/usr/sbin/ethtool',
+	'/usr/bin/ethtool',
+	'/sbin/ethtool',
+	'/bin/ethtool'
+];
+
+const identity_keys = {
+	identifier: 'identifier',
+	extended_identifier: 'extended_identifier',
+	connector: 'connector',
+	transceiver_codes: 'transceiver_codes',
+	transceiver_type: 'transceiver_type',
+	encoding: 'encoding',
+	br_nominal: 'nominal_bit_rate',
+	rate_identifier: 'rate_identifier',
+	vendor_name: 'vendor_name',
+	vendor_oui: 'vendor_oui',
+	vendor_pn: 'vendor_pn',
+	vendor_rev: 'vendor_rev',
+	vendor_sn: 'vendor_sn',
+	date_code: 'date_code',
+	laser_wavelength: 'wavelength'
+};
+
+function shellquote(s) {
+	return `'${replace(s, "'", "'\\''")}'`;
+}
+
+function find_ethtool() {
+	for (let path in ethtool_paths)
+		if (access(path, 'x'))
+			return path;
+
+	return null;
+}
+
+function valid_ifname(ifname) {
+	return type(ifname) == 'string' &&
+		match(ifname, /^[A-Za-z0-9_.:-]+$/) &&
+		access('/sys/class/net/' + ifname);
+}
+
+function scan_ifname(ifname) {
+	if (ifname == 'lo' || match(ifname, /\./))
+		return false;
+
+	if (match(ifname, /^(br-|bond|dummy|erspan|gre|gretap|ifb|ip6tnl|sit|switch|teql|tun|veth|vrf|wg|bat|nlmon)/))
+		return false;
+
+	return valid_ifname(ifname);
+}
+
+function normalize_key(label) {
+	let key = replace(lc(trim(label)), /[^a-z0-9]+/g, '_');
+
+	return replace(key, /^_+|_+$/g, '');
+}
+
+function parse_number(value) {
+	const m = match(value, /[-+]?[0-9]+(\.[0-9]+)?/);
+
+	return m ? +m[0] : null;
+}
+
+function parse_power(value) {
+	let rv = {}, m;
+
+	m = match(value, /([-+]?[0-9]+(\.[0-9]+)?)\s*mW/);
+	if (m)
+		rv.mw = +m[1];
+
+	m = match(value, /([-+]?[0-9]+(\.[0-9]+)?)\s*dBm/);
+	if (m)
+		rv.dbm = +m[1];
+
+	return rv;
+}
+
+function parse_alarm(value) {
+	const text = lc(trim(value || ''));
+
+	if (!length(text))
+		return null;
+
+	if (match(text, /inactive|clear|normal|off|no|false|not asserted/))
+		return false;
+
+	if (match(text, /active|asserted|on|yes|true|fault|alarm/))
+		return true;
+
+	return null;
+}
+
+function read_carrier(ifname) {
+	const path = '/sys/class/net/' + ifname + '/carrier';
+	let carrier;
+
+	if (!access(path))
+		return null;
+
+	carrier = trim(readfile(path) || '');
+
+	if (carrier == '1')
+		return true;
+	if (carrier == '0')
+		return false;
+
+	return null;
+}
+
+function parse_output(ifname, raw, code) {
+	let result = {
+		ifname,
+		ok: false,
+		code,
+		error: null,
+		identity: {},
+		diagnostics: {},
+		status: {
+			module_present: false,
+			link_up: read_carrier(ifname),
+			los_alarm: null,
+			tx_fault_alarm: null
+		},
+		entries: [],
+		raw
+	};
+
+	for (let line in split(raw || '', /\r?\n/)) {
+		let m = match(line, /^\s*([^:]+?)\s*:\s*(.*?)\s*$/);
+
+		if (!m)
+			continue;
+
+		let label = trim(m[1]);
+		let value = trim(m[2]);
+		let key = normalize_key(label);
+
+		if (!length(key) || !length(value))
+			continue;
+
+		push(result.entries, {
+			key,
+			label,
+			value
+		});
+
+		if (identity_keys[key] && result.identity[identity_keys[key]] == null)
+			result.identity[identity_keys[key]] = value;
+
+		if (result.status.los_alarm == null && match(key, /loss.*signal|los/))
+			result.status.los_alarm = parse_alarm(value);
+
+		if (result.status.tx_fault_alarm == null && match(key, /tx.*fault|transmit.*fault|txfault/))
+			result.status.tx_fault_alarm = parse_alarm(value);
+
+		if (match(key, /threshold|alarm|warning/))
+			continue;
+
+		if (result.diagnostics.temperature_c == null && match(key, /temperature/))
+			result.diagnostics.temperature_c = parse_number(value);
+		else if (result.diagnostics.voltage_v == null && match(key, /voltage/))
+			result.diagnostics.voltage_v = parse_number(value);
+		else if (result.diagnostics.tx_bias_ma == null && match(key, /(laser_)?bias(_current)?|tx_bias/))
+			result.diagnostics.tx_bias_ma = parse_number(value);
+		else if (result.diagnostics.tx_power_mw == null &&
+		         match(key, /laser_output_power|transmit.*power|tx.*power/)) {
+			let p = parse_power(value);
+			result.diagnostics.tx_power_mw = p.mw ?? null;
+			result.diagnostics.tx_power_dbm = p.dbm ?? null;
+		}
+		else if (result.diagnostics.rx_power_mw == null &&
+		         match(key, /receiver.*power|rcvr.*power|rx.*power/)) {
+			let p = parse_power(value);
+			result.diagnostics.rx_power_mw = p.mw ?? null;
+			result.diagnostics.rx_power_dbm = p.dbm ?? null;
+		}
+	}
+
+	if (code == 0 && length(result.entries)) {
+		result.ok = true;
+		result.status.module_present = true;
+	}
+	else {
+		result.identity = {};
+		result.diagnostics = {};
+		result.entries = [];
+		result.error = trim(raw || '') || 'No SFP EEPROM data available';
+	}
+
+	return result;
+}
+
+function read_module(ifname, ethtool) {
+	if (!valid_ifname(ifname)) {
+		return {
+			ifname,
+			ok: false,
+			code: 1,
+			error: 'Invalid network interface',
+			identity: {},
+			diagnostics: {},
+			status: {
+				module_present: false,
+				link_up: null,
+				los_alarm: null,
+				tx_fault_alarm: null
+			},
+			entries: [],
+			raw: ''
+		};
+	}
+
+	if (!ethtool) {
+		return {
+			ifname,
+			ok: false,
+			code: 127,
+			error: 'ethtool-full is not installed',
+			identity: {},
+			diagnostics: {},
+			status: {
+				module_present: false,
+				link_up: read_carrier(ifname),
+				los_alarm: null,
+				tx_fault_alarm: null
+			},
+			entries: [],
+			raw: ''
+		};
+	}
+
+	const fd = popen(shellquote(ethtool) + ' -m ' + shellquote(ifname) + ' 2>&1');
+	let raw = fd ? fd.read('all') : '';
+	let code = fd ? fd.close() : 1;
+
+	return parse_output(ifname, raw, code);
+}
+
+function module_interface(result) {
+	if (result.ok)
+		return true;
+
+	const text = lc(trim((result.raw || '') + '\n' + (result.error || '')));
+
+	if (!length(text))
+		return false;
+
+	if (match(text, /operation not supported|not supported|not implemented|invalid argument|unsupported/))
+		return false;
+
+	/*
+	 * Empty SFP cages can fail before EEPROM decode but still report module
+	 * style errors. Copper ports usually fail with "Operation not supported".
+	 */
+	return match(text, /sfp|qsfp|module|transceiver|eeprom|ddm|dom|i2c|not present|absent|no such device|no data available|i\/o error/) != null;
+}
+
+const methods = {
+	scan: {
+		call: function() {
+			const ethtool = find_ethtool();
+			let result = {
+				ethtool: ethtool != null,
+				devices: []
+			};
+
+			for (let ifname in lsdir('/sys/class/net')) {
+				if (!scan_ifname(ifname))
+					continue;
+
+				let module = read_module(ifname, ethtool);
+
+				if (module_interface(module))
+					push(result.devices, module);
+			}
+
+			return result;
+		}
+	},
+
+	module: {
+		args: { ifname: 'string' },
+		call: function(request) {
+			return read_module(request.args.ifname, find_ethtool());
+		}
+	}
+};
+
+return { 'luci.sfp': methods };

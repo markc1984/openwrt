@@ -2,6 +2,46 @@
 
 include ./common.mk
 
+F1100_COMMON_PACKAGES := \
+	cgi-io \
+	ethtool-full \
+	i2c-tools \
+	i2csfp \
+	kmod-bonding \
+	kmod-dummy \
+	kmod-geneve \
+	kmod-gre \
+	kmod-ifb \
+	kmod-ip6-tunnel \
+	kmod-ipip \
+	kmod-iptunnel \
+	kmod-ipvlan \
+	kmod-macvlan \
+	kmod-sched \
+	kmod-sched-core \
+	kmod-sit \
+	kmod-tun \
+	kmod-veth \
+	kmod-vrf \
+	kmod-vxlan \
+	kmod-wireguard \
+	libi2c \
+	libsysfs2 \
+	lm-sensors \
+	luci \
+	luci-app-firewall \
+	luci-app-package-manager \
+	luci-app-sfp-diagnostics \
+	proto-bonding \
+	rpcd-mod-luci \
+	sysfsutils \
+	uboot-envtools
+
+F1100_REALTEK_PACKAGES := \
+	kmod-phy-realtek \
+	rtl8261n-firmware \
+	rtl8264b-firmware
+
 define Device/d-link_dgs-1250-28x
   SOC := rtl9301
   DEVICE_VENDOR := D-Link
@@ -11,6 +51,43 @@ define Device/d-link_dgs-1250-28x
   $(Device/kernel-lzma)
 endef
 TARGET_DEVICES += d-link_dgs-1250-28x
+
+define Device/hasivo_f1100w-4sx-4xgt-common
+  SOC := rtl9303
+  DEVICE_VENDOR := Hasivo
+  DEVICE_MODEL := F1100W-4SX-4XGT
+  DEVICE_ALT0_VENDOR := Hasivo
+  DEVICE_ALT0_MODEL := F1100WP-4SX-4XGT
+  DEVICE_ALT1_VENDOR := Hasivo
+  DEVICE_ALT1_MODEL := F1100W-4SX-4XGT-SE
+  DEVICE_PACKAGES := $(F1100_COMMON_PACKAGES) $(F1100_REALTEK_PACKAGES)
+  IMAGE_SIZE := 29696k
+  $(Device/kernel-lzma)
+endef
+
+define Device/hasivo_f1100w-4sx-4xgt
+  $(Device/hasivo_f1100w-4sx-4xgt-common)
+endef
+TARGET_DEVICES += hasivo_f1100w-4sx-4xgt
+
+define Device/hasivo_f1100wp-4sx-4xgt
+  $(Device/hasivo_f1100w-4sx-4xgt-common)
+  DEVICE_MODEL := F1100WP-4SX-4XGT
+  DEVICE_ALT0_VENDOR :=
+  DEVICE_ALT0_MODEL :=
+  DEVICE_ALT1_VENDOR :=
+  DEVICE_ALT1_MODEL :=
+  DEVICE_PACKAGES += kmod-pse-hasivo-hs104
+endef
+TARGET_DEVICES += hasivo_f1100wp-4sx-4xgt
+
+define Device/hasivo_f1100w-4sx-4xgt-512mb
+  $(Device/hasivo_f1100w-4sx-4xgt-common)
+  DEVICE_VARIANT := (512MB)
+  DEVICE_ALT0_VARIANT := (512MB)
+  DEVICE_ALT1_VARIANT := (512MB)
+endef
+TARGET_DEVICES += hasivo_f1100w-4sx-4xgt-512mb
 
 define Device/hasivo_s1100w-8xgt-se
   SOC := rtl9303

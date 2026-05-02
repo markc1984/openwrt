@@ -40,6 +40,26 @@ realtek_setup_macs_lan()
 	done
 }
 
+hasivo_f1100_get_factory_mac()
+{
+	local part
+	local mac
+
+	for part in "$(find_mtd_part oeminfo)" "$(find_mtd_part firmware)"; do
+		[ -n "$part" ] || continue
+
+		mac=$(strings "$part" 2>/dev/null | \
+			sed -n 's/.*\([0-9A-Fa-f]\{4\}\.[0-9A-Fa-f]\{4\}\.[0-9A-Fa-f]\{4\}\).*/\1/p' | \
+			head -n 1)
+		mac=$(macaddr_canonicalize "$mac")
+
+		[ -n "$mac" ] && [ "$mac" != "00:e0:4c:00:00:00" ] && {
+			echo "$mac"
+			return
+		}
+	done
+}
+
 realtek_setup_macs()
 {
 	local board="$1"
@@ -94,6 +114,16 @@ realtek_setup_macs()
 	plasmacloud,psx28|\
 	zyxel,gs1920-24hp-v2)
 		lan_mac="$(get_mac_label)"
+		;;
+	hasivo,f1100w-4sx-4xgt|\
+	hasivo,f1100w-4sx-4xgt-512mb|\
+	hasivo,f1100wp-4sx-4xgt)
+		lan_mac=$(mtd_get_mac_ascii u-boot-env ethaddr)
+		[ -z "$lan_mac" ] || [ "$lan_mac" = "00:e0:4c:00:00:00" ] && lan_mac=$(hasivo_f1100_get_factory_mac)
+		[ -z "$lan_mac" ] || [ "$lan_mac" = "00:e0:4c:00:00:00" ] && lan_mac=$(macaddr_random)
+		lan_mac_start=$lan_mac
+		eth0_mac=$lan_mac
+		label_mac=$lan_mac
 		;;
 	tplink,tl-st1008f-v2|\
 	zyxel,xgs1010-12-a1)

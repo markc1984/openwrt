@@ -1,0 +1,13 @@
+{
+	"luci-app-sfp-diagnostics": {
+		"description": "Grant access to SFP module diagnostics",
+		"read": {
+			"ubus": {
+				"luci.sfp": [
+					"scan",
+					"module"
+				]
+			}
+		}
+	}
+}
